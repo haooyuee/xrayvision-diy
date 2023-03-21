@@ -8,32 +8,35 @@ import torchvision, torchvision.transforms
 import skimage.transform
 import sklearn, sklearn.model_selection
 import random
-#import train_utils
+import train_utils
 import torchxrayvision as xrv
 
 if __name__ == '__main__': 
     
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
-    parser.add_argument('-name', type=str, default="nih_resnet50")
+    parser.add_argument('-name', type=str, default="nih_EfficientNet_V2")
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
-    parser.add_argument('--model', type=str, default="resnet50")
+    parser.add_argument('--model', type=str, default="EfficientNet_V2")
     parser.add_argument('--seed', type=int, default=0, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
     parser.add_argument('--num_epochs', type=int, default=10, help='')
     parser.add_argument('--batch_size', type=int, default=8, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
     parser.add_argument('--lr', type=float, default=0.001, help='')
-    #parser.add_argument('--threads', type=int, default=4, help='')
+    parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
+    parser.add_argument('--taskweights', type=bool, default=True, help='')
+    parser.add_argument('--featurereg', type=bool, default=False, help='')
+    parser.add_argument('--weightreg', type=bool, default=False, help='')
     parser.add_argument('--data_aug', type=bool, default=True, help='')
     parser.add_argument('--data_aug_rot', type=int, default=45, help='')
     parser.add_argument('--data_aug_trans', type=float, default=0.15, help='')
     parser.add_argument('--data_aug_scale', type=float, default=0.15, help='')
     #parser.add_argument('--label_concat', type=bool, default=False, help='')
     #parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
-    #parser.add_argument('--labelunion', type=bool, default=False, help='')
+    parser.add_argument('--labelunion', type=bool, default=False, help='')
     
     print(os.getcwd())
     cfg = parser.parse_args()
@@ -72,6 +75,18 @@ if __name__ == '__main__':
         datas_names.append("chex")
     
     print(datas)
+
+    if cfg.labelunion:
+        newlabels = set()
+        for d in datas:
+            newlabels = newlabels.union(d.pathologies)
+        newlabels.remove("Support Devices")
+        print(list(newlabels))
+        for d in datas:
+            xrv.datasets.relabel_dataset(list(newlabels), d)
+    else:
+        for d in datas:
+            xrv.datasets.relabel_dataset(xrv.datasets.default_pathologies, d)
 
     #cut out training sets
     train_datas = []
@@ -115,6 +130,29 @@ if __name__ == '__main__':
     print("test_dataset.labels.shape", test_dataset.labels.shape)
     print("train_dataset",train_dataset)
     print("test_dataset",test_dataset)
+
+    # create models
+    if "densenet" in cfg.model:
+        model = xrv.models.DenseNet(num_classes=train_dataset.labels.shape[1], in_channels=1, 
+                                    **xrv.models.get_densenet_params(cfg.model)) 
+    elif "resnet101" in cfg.model:
+        model = torchvision.models.resnet101(num_classes=train_dataset.labels.shape[1], pretrained=False)
+        #patch for single channel
+        model.conv1 = torch.nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+    elif "resnet50" in cfg.model:
+        model = torchvision.models.resnet50(num_classes=train_dataset.labels.shape[1], pretrained=False)
+        #patch for single channel
+        model.conv1 = torch.nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    elif "EfficientNet_V2" in cfg.model:
+        model = torchvision.models.efficientnet_v2_s(num_classes=train_dataset.labels.shape[1], pretrained=False)
+        #patch for single channel
+        print(model)
+        model.conv1 = torch.nn.Conv2d(1, 3, kernel_size=1, stride=1, padding=0, bias=False)
+    else:
+        raise Exception("no model")
+    
+    train_utils.train(model, train_dataset, cfg)
 
 
     

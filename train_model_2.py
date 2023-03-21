@@ -11,6 +11,8 @@ import random
 import train_utils
 import torchxrayvision as xrv
 
+import nih_dataset
+
 if __name__ == '__main__': 
     
     parser = argparse.ArgumentParser()
@@ -19,11 +21,11 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
-    parser.add_argument('--model', type=str, default="EfficientNet_V2")
+    parser.add_argument('--model', type=str, default="densenet")
     parser.add_argument('--seed', type=int, default=0, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
     parser.add_argument('--num_epochs', type=int, default=10, help='')
-    parser.add_argument('--batch_size', type=int, default=8, help='')
+    parser.add_argument('--batch_size', type=int, default=1, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
     parser.add_argument('--lr', type=float, default=0.001, help='')
     parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
@@ -35,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_aug_trans', type=float, default=0.15, help='')
     parser.add_argument('--data_aug_scale', type=float, default=0.15, help='')
     #parser.add_argument('--label_concat', type=bool, default=False, help='')
-    #parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
+    parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
     parser.add_argument('--labelunion', type=bool, default=False, help='')
     
     print(os.getcwd())
@@ -60,7 +62,7 @@ if __name__ == '__main__':
     datas_names = []
     #in our case will only use 2 dataset [nih,cheXpert]
     if "nih" in cfg.dataset:
-        dataset = xrv.datasets.NIH_Dataset(
+        dataset = nih_dataset.NIH_Dataset(
             imgpath=cfg.dataset_dir + "/images-224-NIH", #changed
             transform=transforms, data_aug=data_aug, unique_patients=False, views=["PA","AP"])
         datas.append(dataset)

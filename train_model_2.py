@@ -55,7 +55,7 @@ if __name__ == '__main__':
             torchvision.transforms.ToTensor()
         ])
     print(data_aug)
-    transforms = torchvision.transforms.Compose([xrv.datasets.XRayCenterCrop(),xrv.datasets.XRayResizer(512)])
+    transforms = torchvision.transforms.Compose([xrv.datasets.XRayCenterCrop(),xrv.datasets.XRayResizer(512)])####Resizer(512)??????????????????#########
     print(transforms)
 
     datas = []
@@ -90,6 +90,7 @@ if __name__ == '__main__':
         for d in datas:
             xrv.datasets.relabel_dataset(xrv.datasets.default_pathologies, d)
 
+
     #cut out training sets
     train_datas = []
     test_datas = []
@@ -100,7 +101,7 @@ if __name__ == '__main__':
             dataset.csv["patientid"] = ["{}-{}".format(dataset.__class__.__name__, i) for i in range(len(dataset))]
             
         gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.8,test_size=0.2, random_state=cfg.seed)
-        
+        print("data_distribution", dataset)      
         train_inds, test_inds = next(gss.split(X=range(len(dataset)), groups=dataset.csv.patientid))
         train_dataset = xrv.datasets.SubsetDataset(dataset, train_inds)
         test_dataset = xrv.datasets.SubsetDataset(dataset, test_inds)

@@ -17,11 +17,11 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
-    parser.add_argument('-name', type=str, default="pretrain_densenet") #pretrain_densenet
+    parser.add_argument('-name', type=str, default="pretrain_densenet_AUCM_MultiLabel") #pretrain_densenet
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
-    parser.add_argument('--model', type=str, default="densenet")
+    parser.add_argument('--model', type=str, default="pretrain_densenet")
     parser.add_argument('--seed', type=int, default=0, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
     parser.add_argument('--num_epochs', type=int, default=10, help='')
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     #in our case will only use 2 dataset [nih,cheXpert]
     if "nih" in cfg.dataset:
         dataset = nih_dataset.NIH_Dataset(
-            imgpath=cfg.dataset_dir + "/images-224-NIH", #changed
+            imgpath=cfg.dataset_dir + "/images-NIH-224", #changed
             transform=transforms, data_aug=data_aug, unique_patients=False, views=["PA","AP"])
         datas.append(dataset)
         datas_names.append("nih")

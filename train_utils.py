@@ -290,7 +290,7 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         optimizer.step()
 
         # validation
-        if batch_idx % 100 == 0:
+        if batch_idx % 4000 == 0:
             model.eval()
             with torch.no_grad():    
                 test_pred = []

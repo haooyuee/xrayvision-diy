@@ -17,7 +17,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
-    parser.add_argument('-name', type=str, default="nih_EfficientNet_V2")
+    parser.add_argument('-name', type=str, default="pretrain_densenet") #pretrain_densenet
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
@@ -25,21 +25,24 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
     parser.add_argument('--num_epochs', type=int, default=10, help='')
-    parser.add_argument('--batch_size', type=int, default=1, help='')
+    parser.add_argument('--batch_size', type=int, default=4, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
     parser.add_argument('--lr', type=float, default=0.001, help='')
     parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
-    parser.add_argument('--taskweights', type=bool, default=True, help='')
+    parser.add_argument('--taskweights', type=bool, default=False, help='')# something interesting, not sure ?+++++++++++++++++++++++++
     parser.add_argument('--featurereg', type=bool, default=False, help='')
     parser.add_argument('--weightreg', type=bool, default=False, help='')
     parser.add_argument('--data_aug', type=bool, default=True, help='')
     parser.add_argument('--data_aug_rot', type=int, default=45, help='')
     parser.add_argument('--data_aug_trans', type=float, default=0.15, help='')
     parser.add_argument('--data_aug_scale', type=float, default=0.15, help='')
-    #parser.add_argument('--label_concat', type=bool, default=False, help='')
+    parser.add_argument('--label_concat', type=bool, default=False, help='')
     parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
     parser.add_argument('--labelunion', type=bool, default=False, help='')
-    
+    #We add:
+    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')#BCEWithLogitsLoss #CrossEntropyLoss AUCM_MultiLabel
+    parser.add_argument('--optimizer', type=str, default='PESG', help='')#adam PESG
+     
     print(os.getcwd())
     cfg = parser.parse_args()
     print(cfg)
@@ -152,6 +155,12 @@ if __name__ == '__main__':
         #patch for single channel
         print(model)
         model.conv1 = torch.nn.Conv2d(1, 3, kernel_size=1, stride=1, padding=0, bias=False)
+
+
+    elif "pretrain_densenet" in cfg.model:
+        model_path = "train_output/nih-densenet-test-best.pt"
+        model = torch.load(model_path)
+
     else:
         raise Exception("no model")
     

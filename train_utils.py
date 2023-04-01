@@ -88,17 +88,13 @@ def train(model, dataset, cfg):
             criterion = torch.nn.CrossEntropyLoss()
             raise ValueError('CrossEntropyLoss not function')
         elif cfg.loss_func == 'AUCM_MultiLabel':
-            #imratio = np.nansum(train_loader.dataset.labels, axis=0)
-            #print(train_loader.dataset.labels)
             n_positive = np.nansum(train_loader.dataset.labels, axis=0)
-            #print(n_positive)
             n_positive = n_positive[n_positive != 0]#remove 0 value
-            #print(n_positive)
             n_data = train_loader.dataset.labels.shape[0]
             imratio = n_positive/n_data
-            #print(imratio)
             imratio = torch.from_numpy(imratio).to(device).float()
-            print("imratio", imratio)
+            print("imratio")
+            print(imratio)
             #raise ValueError('test')
             criterion = losses.AUCM_MultiLabel_V1(num_classes = 14, imratio=imratio, device=device)
         else:
@@ -115,8 +111,8 @@ def train(model, dataset, cfg):
             optim = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=1e-5, amsgrad=True)
         elif cfg.optimizer == 'PESG':
             optim = PESG(model, 
-                 loss_fn=losses.AUCM_MultiLabel_V1(num_classes = 14, imratio=imratio, device=device), 
-                 lr=0.1, 
+                 loss_fn=criterion, 
+                 lr=cfg.lr, 
                  margin=1, 
                  epoch_decay=2e-3, 
                  weight_decay=1e-5)
@@ -130,13 +126,14 @@ def train(model, dataset, cfg):
 
     
 
- 
+    
     # Checkpointing
     start_epoch = 0
     best_metric = 0.
     weights_for_best_validauc = None
     auc_test = None
     metrics = []
+    '''
     weights_files = glob(join(cfg.output_dir, f'{dataset_name}-e*.pt'))  # Find all weights files
     if len(weights_files):
         # Find most recent epoch
@@ -154,13 +151,15 @@ def train(model, dataset, cfg):
 
         print("Resuming training at epoch {0}.".format(start_epoch))
         print("Weights loaded: {0}".format(weights_file))
+    '''
+    
 
     model.to(device)
     
     for epoch in range(start_epoch, cfg.num_epochs):
-        if cfg.loss_func == 'AUCM_MultiLabel': #add***************
-            if epoch > 0:
-                criterion.update_regularizer(decay_factor=10)    
+        #if cfg.loss_func == 'AUCM_MultiLabel': #add***************
+        #    if epoch > 0:
+        #        optim.update_regularizer(decay_factor=2)    
 
         avg_loss = train_epoch(cfg=cfg,
                                epoch=epoch,
@@ -270,7 +269,7 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         #print('targets + outputs')
         #print(targets)
         outputs = model(images)
-        print(outputs)
+        #print(outputs)
         
 
 

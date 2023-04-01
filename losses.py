@@ -70,7 +70,9 @@ class AUCM_MultiLabel_V1(torch.nn.Module):
         self.margin = margin
         self.p =  imratio 
         self.num_classes = num_classes
-        if self.p:
+        #print(imratio)
+        if imratio.bool().any():#changed
+           print(num_classes, len(imratio))
            assert len(imratio)==num_classes, 'Length of imratio needs to be same as num_classes!'
         else:
             self.p = [0.0]*num_classes

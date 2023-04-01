@@ -72,29 +72,6 @@ def train(model, dataset, cfg):
                                                num_workers=cfg.threads, 
                                                pin_memory=cfg.cuda)
     #print(model)
-
-    #DIY optimizer
-    if cfg.optimizer == None:
-        raise ValueError('optimizer is not defined')
-    else:
-        #default optimizer
-        if cfg.optimizer == 'adam':
-            optim = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=1e-5, amsgrad=True)
-        elif cfg.optimizer == 'PESG':
-            optim = PESG(model, 
-                 loss_fn=losses.AUCM_MultiLabel_V1(), 
-                 lr=0.05, 
-                 margin=1, 
-                 epoch_decay=2e-3, 
-                 weight_decay=1e-5)
-        ##########################
-        # can add more optimizer #
-        ##########################
-        else:
-            raise ValueError('invalid optimizer')
-    print('optim : ')
-    print(optim)
-
     #DIY loss function
     if cfg.loss_func == None:
         raise ValueError('loss function is not defined')
@@ -109,13 +86,49 @@ def train(model, dataset, cfg):
         #Not Binary
         elif cfg.loss_func == 'CrossEntropyLoss':
             criterion = torch.nn.CrossEntropyLoss()
-            #raise ValueError('invalid loss function')
+            raise ValueError('CrossEntropyLoss not function')
         elif cfg.loss_func == 'AUCM_MultiLabel':
-            criterion = losses.AUCM_MultiLabel_V1(num_classes = 14)
+            #imratio = np.nansum(train_loader.dataset.labels, axis=0)
+            #print(train_loader.dataset.labels)
+            n_positive = np.nansum(train_loader.dataset.labels, axis=0)
+            #print(n_positive)
+            n_positive = n_positive[n_positive != 0]#remove 0 value
+            #print(n_positive)
+            n_data = train_loader.dataset.labels.shape[0]
+            imratio = n_positive/n_data
+            #print(imratio)
+            imratio = torch.from_numpy(imratio).to(device).float()
+            print("imratio", imratio)
+            #raise ValueError('test')
+            criterion = losses.AUCM_MultiLabel_V1(num_classes = 14, imratio=imratio, device=device)
         else:
             raise ValueError('invalid loss function')
     print('criterion : ')
     print(criterion)
+
+    #DIY optimizer
+    if cfg.optimizer == None:
+        raise ValueError('optimizer is not defined')
+    else:
+        #default optimizer
+        if cfg.optimizer == 'adam':
+            optim = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=1e-5, amsgrad=True)
+        elif cfg.optimizer == 'PESG':
+            optim = PESG(model, 
+                 loss_fn=losses.AUCM_MultiLabel_V1(num_classes = 14, imratio=imratio, device=device), 
+                 lr=0.1, 
+                 margin=1, 
+                 epoch_decay=2e-3, 
+                 weight_decay=1e-5)
+        ##########################
+        # can add more optimizer #
+        ##########################
+        else:
+            raise ValueError('invalid optimizer')
+    print('optim : ')
+    print(cfg.optimizer)
+
+    
 
  
     # Checkpointing
@@ -145,6 +158,9 @@ def train(model, dataset, cfg):
     model.to(device)
     
     for epoch in range(start_epoch, cfg.num_epochs):
+        if cfg.loss_func == 'AUCM_MultiLabel': #add***************
+            if epoch > 0:
+                criterion.update_regularizer(decay_factor=10)    
 
         avg_loss = train_epoch(cfg=cfg,
                                epoch=epoch,
@@ -155,7 +171,8 @@ def train(model, dataset, cfg):
                                valid_loader=valid_loader,
                                criterion=criterion)
         
-        auc_valid = valid_test_epoch(name='Valid',
+        auc_valid = valid_test_epoch(cfg=cfg,
+                                     name='Valid',
                                      epoch=epoch,
                                      model=model,
                                      device=device,
@@ -236,6 +253,7 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         weights = weights/weights.max()
         weights = torch.from_numpy(weights).to(device).float()
         print("task weights", weights)
+
     
     avg_loss = []
     t = tqdm(train_loader)
@@ -252,7 +270,8 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         #print('targets + outputs')
         #print(targets)
         outputs = model(images)
-        #print(outputs)
+        print(outputs)
+        
 
 
         if cfg.loss_func == 'BCEWithLogitsLoss':
@@ -262,18 +281,22 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
             mask_output = outputs[mask]
             mask_target = targets[mask]
             #print('*********************************')
-            #print(outputs)
-            #print(targets)
-            #print(mask)
-            mask_output = mask_output.view(cfg.batch_size, -1)
-            mask_target = mask_target.view(cfg.batch_size, -1)
             #print(mask_output)
             #print(mask_target)
+            #print(mask)
+            #print(mask_output.size())
+            #print(mask_target.size())
+            #print(outputs.size(0))
+            #print(targets.size(0))
+            mask_output = mask_output.view(outputs.size(0), -1)
+            mask_target = mask_target.view(targets.size(0), -1)
             #raise ValueError('test')
+            #print(mask_output)
             mask_output = torch.sigmoid(mask_output)
-            loss = criterion(mask_output, mask_target)
+            #print(mask_output)
+            loss = criterion(mask_output, mask_target, auto=False)
             #print(loss)
-    
+            #raise ValueError('test')
         if cfg.featurereg:
             feat = model.features(images)
             loss += feat.abs().sum()
@@ -288,7 +311,8 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         t.set_description(f'Epoch {epoch + 1} - Train - Loss = {np.mean(avg_loss):4.4f}')
 
         optimizer.step()
-
+        
+        '''
         # validation
         if batch_idx % 4000 == 0:
             model.eval()
@@ -324,10 +348,10 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
             print ('Epoch=%s, BatchID=%s, Val_AUC=%.4f, Best_Val_AUC=%.4f'%(epoch, batch_idx, val_auc, best_val_auc))
             if cfg.optimizer == 'PESG':
                 print ('optimizer_lr=%.4f'%(optimizer.lr))
-
+        '''
     return np.mean(avg_loss)
 
-def valid_test_epoch(name, epoch, model, device, data_loader, criterion, limit=20000): #change limit
+def valid_test_epoch(cfg, name, epoch, model, device, data_loader, criterion, limit=20000): #change limit
     model.eval()
 
     avg_loss = []
@@ -350,6 +374,7 @@ def valid_test_epoch(name, epoch, model, device, data_loader, criterion, limit=2
 
             outputs = model(images)
             
+            
             loss = torch.zeros(1).to(device).double()
             for task in range(targets.shape[1]):
                 task_output = outputs[:,task]
@@ -361,12 +386,12 @@ def valid_test_epoch(name, epoch, model, device, data_loader, criterion, limit=2
                     loss += criterion(task_output.double(), task_target.double())
                     #print('+')
                     #print(loss)
-                
+                    
                 task_outputs[task].append(task_output.detach().cpu().numpy())
                 task_targets[task].append(task_target.detach().cpu().numpy())
 
             loss = loss.sum()
-            
+                
             avg_loss.append(loss.detach().cpu().numpy())
             t.set_description(f'Epoch {epoch + 1} - {name} - Loss = {np.mean(avg_loss):4.4f}')
             

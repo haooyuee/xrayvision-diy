@@ -21,13 +21,13 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
-    parser.add_argument('--model', type=str, default="pretrain_densenet")
+    parser.add_argument('--model', type=str, default="densenet")#pretrain_densenet -" pretrain"
     parser.add_argument('--seed', type=int, default=0, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
     parser.add_argument('--num_epochs', type=int, default=10, help='')
     parser.add_argument('--batch_size', type=int, default=4, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
-    parser.add_argument('--lr', type=float, default=0.001, help='')
+    parser.add_argument('--lr', type=float, default=0.01, help='')
     parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
     parser.add_argument('--taskweights', type=bool, default=False, help='')# something interesting, not sure ?+++++++++++++++++++++++++
     parser.add_argument('--featurereg', type=bool, default=False, help='')
@@ -39,10 +39,16 @@ if __name__ == '__main__':
     parser.add_argument('--label_concat', type=bool, default=False, help='')
     parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
     parser.add_argument('--labelunion', type=bool, default=False, help='')
-    #We add:
-    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')#BCEWithLogitsLoss #CrossEntropyLoss AUCM_MultiLabel
-    parser.add_argument('--optimizer', type=str, default='PESG', help='')#adam PESG
-     
+
+        #add:
+    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel
+    parser.add_argument('--optimizer', type=str, default='PESG', help='')                   #adam or PESG
+        #only for AUCM_MultiLabel and PESG
+    parser.add_argument('--update_lr', type=bool, default=False, help='')                   #AUCM_MultiLabel update lr
+    parser.add_argument('--update_regularizer', type=bool, default=False, help='')          #AUCM_MultiLabel update lr and update update_regularizer #DO NOT USE !!!
+    parser.add_argument('--decay_factor', type=float, default=2, help='')                   #new = old/decay_factor
+    parser.add_argument('--decay_epoch', type=int, default=10, help='')                     #epoch%decay_epoch == 0 do update
+
     print(os.getcwd())
     cfg = parser.parse_args()
     print(cfg)

@@ -157,9 +157,13 @@ def train(model, dataset, cfg):
     model.to(device)
     
     for epoch in range(start_epoch, cfg.num_epochs):
-        #if cfg.loss_func == 'AUCM_MultiLabel': #add***************
-        #    if epoch > 0:
-        #        optim.update_regularizer(decay_factor=2)    
+        #add hyper update
+        if cfg.loss_func == 'AUCM_MultiLabel':
+            if epoch%cfg.decay_epoch == 0:
+                if cfg.update_lr :
+                    optim.update_lr(decay_factor=cfg.decay_factor)
+                elif cfg.update_regularizer:
+                    optim.update_regularizer(decay_factor=cfg.decay_factor)
 
         avg_loss = train_epoch(cfg=cfg,
                                epoch=epoch,

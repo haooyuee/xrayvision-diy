@@ -8,33 +8,47 @@ import torchvision, torchvision.transforms
 import skimage.transform
 import sklearn, sklearn.model_selection
 import random
-#import train_utils
+import train_utils
 import torchxrayvision as xrv
+
+import nih_dataset
 
 if __name__ == '__main__': 
     
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
-    parser.add_argument('-name', type=str, default="nih_resnet50")
+    parser.add_argument('-name', type=str, default="pretrain_densenet_AUCM_MultiLabel") #pretrain_densenet
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
-    parser.add_argument('--model', type=str, default="resnet50")
+    parser.add_argument('--model', type=str, default="densenet")#pretrain_densenet -" pretrain"
     parser.add_argument('--seed', type=int, default=0, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
     parser.add_argument('--num_epochs', type=int, default=10, help='')
-    parser.add_argument('--batch_size', type=int, default=8, help='')
+    parser.add_argument('--batch_size', type=int, default=4, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
-    parser.add_argument('--lr', type=float, default=0.001, help='')
-    #parser.add_argument('--threads', type=int, default=4, help='')
+    parser.add_argument('--lr', type=float, default=0.01, help='')
+    parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
+    parser.add_argument('--taskweights', type=bool, default=False, help='')# something interesting, not sure ?+++++++++++++++++++++++++
+    parser.add_argument('--featurereg', type=bool, default=False, help='')
+    parser.add_argument('--weightreg', type=bool, default=False, help='')
     parser.add_argument('--data_aug', type=bool, default=True, help='')
     parser.add_argument('--data_aug_rot', type=int, default=45, help='')
     parser.add_argument('--data_aug_trans', type=float, default=0.15, help='')
     parser.add_argument('--data_aug_scale', type=float, default=0.15, help='')
-    #parser.add_argument('--label_concat', type=bool, default=False, help='')
-    #parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
-    #parser.add_argument('--labelunion', type=bool, default=False, help='')
-    
+    parser.add_argument('--label_concat', type=bool, default=False, help='')
+    parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
+    parser.add_argument('--labelunion', type=bool, default=False, help='')
+
+        #add:
+    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel
+    parser.add_argument('--optimizer', type=str, default='PESG', help='')                   #adam or PESG
+        #only for AUCM_MultiLabel and PESG
+    parser.add_argument('--update_lr', type=bool, default=False, help='')                   #AUCM_MultiLabel update lr
+    parser.add_argument('--update_regularizer', type=bool, default=False, help='')          #AUCM_MultiLabel update lr and update update_regularizer #DO NOT USE !!!
+    parser.add_argument('--decay_factor', type=float, default=2, help='')                   #new = old/decay_factor
+    parser.add_argument('--decay_epoch', type=int, default=10, help='')                     #epoch%decay_epoch == 0 do update
+
     print(os.getcwd())
     cfg = parser.parse_args()
     print(cfg)
@@ -50,15 +64,15 @@ if __name__ == '__main__':
             torchvision.transforms.ToTensor()
         ])
     print(data_aug)
-    transforms = torchvision.transforms.Compose([xrv.datasets.XRayCenterCrop(),xrv.datasets.XRayResizer(512)])
+    transforms = torchvision.transforms.Compose([xrv.datasets.XRayCenterCrop(),xrv.datasets.XRayResizer(512)])####Resizer(512)??????????????????#########
     print(transforms)
 
     datas = []
     datas_names = []
     #in our case will only use 2 dataset [nih,cheXpert]
     if "nih" in cfg.dataset:
-        dataset = xrv.datasets.NIH_Dataset(
-            imgpath=cfg.dataset_dir + "/images-224-NIH", #changed
+        dataset = nih_dataset.NIH_Dataset(
+            imgpath=cfg.dataset_dir + "/images-NIH-224", #changed
             transform=transforms, data_aug=data_aug, unique_patients=False, views=["PA","AP"])
         datas.append(dataset)
         datas_names.append("nih")
@@ -73,6 +87,19 @@ if __name__ == '__main__':
     
     print(datas)
 
+    if cfg.labelunion:
+        newlabels = set()
+        for d in datas:
+            newlabels = newlabels.union(d.pathologies)
+        newlabels.remove("Support Devices")
+        print(list(newlabels))
+        for d in datas:
+            xrv.datasets.relabel_dataset(list(newlabels), d)
+    else:
+        for d in datas:
+            xrv.datasets.relabel_dataset(xrv.datasets.default_pathologies, d)
+
+
     #cut out training sets
     train_datas = []
     test_datas = []
@@ -83,7 +110,7 @@ if __name__ == '__main__':
             dataset.csv["patientid"] = ["{}-{}".format(dataset.__class__.__name__, i) for i in range(len(dataset))]
             
         gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.8,test_size=0.2, random_state=cfg.seed)
-        
+        print("data_distribution", dataset)      
         train_inds, test_inds = next(gss.split(X=range(len(dataset)), groups=dataset.csv.patientid))
         train_dataset = xrv.datasets.SubsetDataset(dataset, train_inds)
         test_dataset = xrv.datasets.SubsetDataset(dataset, test_inds)
@@ -115,6 +142,35 @@ if __name__ == '__main__':
     print("test_dataset.labels.shape", test_dataset.labels.shape)
     print("train_dataset",train_dataset)
     print("test_dataset",test_dataset)
+
+    # create models
+    if "densenet" in cfg.model:
+        model = xrv.models.DenseNet(num_classes=train_dataset.labels.shape[1], in_channels=1, 
+                                    **xrv.models.get_densenet_params(cfg.model)) 
+    elif "resnet101" in cfg.model:
+        model = torchvision.models.resnet101(num_classes=train_dataset.labels.shape[1], pretrained=False)
+        #patch for single channel
+        model.conv1 = torch.nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+    elif "resnet50" in cfg.model:
+        model = torchvision.models.resnet50(num_classes=train_dataset.labels.shape[1], pretrained=False)
+        #patch for single channel
+        model.conv1 = torch.nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    elif "EfficientNet_V2" in cfg.model:
+        model = torchvision.models.efficientnet_v2_s(num_classes=train_dataset.labels.shape[1], pretrained=False)
+        #patch for single channel
+        print(model)
+        model.conv1 = torch.nn.Conv2d(1, 3, kernel_size=1, stride=1, padding=0, bias=False)
+
+
+    elif "pretrain_densenet" in cfg.model:
+        model_path = "train_output/nih-densenet-test-best.pt"
+        model = torch.load(model_path)
+
+    else:
+        raise Exception("no model")
+    
+    train_utils.train(model, train_dataset, cfg)
 
 
     

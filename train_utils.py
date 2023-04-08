@@ -1,3 +1,4 @@
+import json
 import os
 import pickle
 import pprint
@@ -55,7 +56,7 @@ def train(model, dataset, cfg):
         torch.backends.cudnn.benchmark = False
 
     # Dataset    
-    gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.8,test_size=0.2, random_state=cfg.seed)
+    gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.01,test_size=0.03, random_state=cfg.seed) #0.03 for test
     train_inds, test_inds = next(gss.split(X=range(len(dataset)), groups=dataset.csv.patientid))
     train_dataset = xrv.datasets.SubsetDataset(dataset, train_inds)
     valid_dataset = xrv.datasets.SubsetDataset(dataset, test_inds)
@@ -110,7 +111,7 @@ def train(model, dataset, cfg):
         if cfg.optimizer == 'adam':
             optim = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=1e-5, amsgrad=True)
         elif cfg.optimizer == 'PESG':
-            optim = PESG(model, 
+            optim = PESG(model,
                  loss_fn=criterion, 
                  lr=cfg.lr, 
                  margin=1, 
@@ -133,29 +134,15 @@ def train(model, dataset, cfg):
     weights_for_best_validauc = None
     auc_test = None
     metrics = []
-    '''
-    weights_files = glob(join(cfg.output_dir, f'{dataset_name}-e*.pt'))  # Find all weights files
-    if len(weights_files):
-        # Find most recent epoch
-        epochs = np.array(
-            [int(w[len(join(cfg.output_dir, f'{dataset_name}-e')):-len('.pt')].split('-')[0]) for w in weights_files])
-        start_epoch = epochs.max()
-        weights_file = [weights_files[i] for i in np.argwhere(epochs == np.amax(epochs)).flatten()][0]
-        model.load_state_dict(torch.load(weights_file).state_dict())
-
-        with open(join(cfg.output_dir, f'{dataset_name}-metrics.pkl'), 'rb') as f:
-            metrics = pickle.load(f)
-
-        best_metric = metrics[-1]['best_metric']
-        weights_for_best_validauc = model.state_dict()
-
-        print("Resuming training at epoch {0}.".format(start_epoch))
-        print("Weights loaded: {0}".format(weights_file))
-    '''
     
-
     model.to(device)
-    
+
+    #save train process
+    logger = dict()
+    logger['train_losses'] = []
+    logger['eval_losses'] = []
+    logger['eval_auc'] = []
+
     for epoch in range(start_epoch, cfg.num_epochs):
         #add hyper update
         if cfg.loss_func == 'AUCM_MultiLabel':
@@ -165,7 +152,7 @@ def train(model, dataset, cfg):
                 elif cfg.update_regularizer:
                     optim.update_regularizer(decay_factor=cfg.decay_factor)
 
-        avg_loss = train_epoch(cfg=cfg,
+        avg_loss  = train_epoch(cfg=cfg,
                                epoch=epoch,
                                model=model,
                                device=device,
@@ -174,14 +161,19 @@ def train(model, dataset, cfg):
                                valid_loader=valid_loader,
                                criterion=criterion)
         
-        auc_valid = valid_test_epoch(cfg=cfg,
-                                     name='Valid',
-                                     epoch=epoch,
-                                     model=model,
-                                     device=device,
-                                     data_loader=valid_loader,
-                                     criterion = torch.nn.CrossEntropyLoss()
-                                     )[0]
+        auc_valid, valid_loss = valid_test_epoch(cfg=cfg,
+                                name='Valid',
+                                epoch=epoch,
+                                model=model,
+                                device=device,
+                                data_loader=valid_loader,
+                                criterion = criterion
+                                )
+        
+        #logger
+        logger['train_losses'].append(avg_loss.item())
+        logger['eval_losses'].append(valid_loss.item())
+        logger['eval_auc'].append(auc_valid.item())
 
         if np.mean(auc_valid) > best_metric:
             best_metric = np.mean(auc_valid)
@@ -203,9 +195,21 @@ def train(model, dataset, cfg):
 
         torch.save(model, join(cfg.output_dir, f'{dataset_name}-e{epoch + 1}.pt'))
 
+    logger['final_train_losses'] = avg_loss.item()
+    logger['final_eval_losses'] = valid_loss.item()
+    logger['final_eval_auc'] = auc_valid.item()
+ 
+    save_logs(logger, cfg.output_dir, str(dataset_name))
     return metrics, best_metric, weights_for_best_validauc
 
 
+def save_logs(dictionary, log_dir, exp_id):
+    log_dir = os.path.join(log_dir, exp_id)
+    os.makedirs(log_dir, exist_ok=True)
+    # Log arguments
+    with open(os.path.join(log_dir, "args.json"), "w") as f:
+        json.dump(dictionary, f, indent=2)
+    
 
 def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = None):
     loss = torch.zeros(1).to(device).float()  
@@ -270,88 +274,32 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         
         images = samples["img"].float().to(device)
         targets = samples["lab"].to(device)
-        #print('targets + outputs')
-        #print(targets)
         outputs = model(images)
-        #print(outputs)
         
-
-
         if cfg.loss_func == 'BCEWithLogitsLoss':
             loss = BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights)
         elif cfg.loss_func == 'AUCM_MultiLabel':
             mask = ~torch.isnan(targets)
             mask_output = outputs[mask]
             mask_target = targets[mask]
-            #print('*********************************')
-            #print(mask_output)
-            #print(mask_target)
-            #print(mask)
-            #print(mask_output.size())
-            #print(mask_target.size())
-            #print(outputs.size(0))
-            #print(targets.size(0))
             mask_output = mask_output.view(outputs.size(0), -1)
             mask_target = mask_target.view(targets.size(0), -1)
-            #raise ValueError('test')
-            #print(mask_output)
             mask_output = torch.sigmoid(mask_output)
-            #print(mask_output)
             loss = criterion(mask_output, mask_target, auto=False)
-            #print(loss)
-            #raise ValueError('test')
         if cfg.featurereg:
             feat = model.features(images)
-            loss += feat.abs().sum()
-            
+            loss += feat.abs().sum()    
         if cfg.weightreg:
             loss += model.classifier.weight.abs().sum()
         
-
         loss.backward()
 
         avg_loss.append(loss.detach().cpu().numpy())
         t.set_description(f'Epoch {epoch + 1} - Train - Loss = {np.mean(avg_loss):4.4f}')
 
         optimizer.step()
-        
-        '''
-        # validation
-        if batch_idx % 4000 == 0:
-            model.eval()
-            with torch.no_grad():    
-                test_pred = []
-                test_true = []
-                limit = 0
-                for jdx, samples in enumerate(valid_loader):
 
-                    images = samples["img"].float().to(device)
-                    targets = samples["lab"].to(device)
-                    #test_data, test_label = data
-                    #test_data = test_data.cuda()              
-                    y_pred = model(images)
-
-                    mask = ~torch.isnan(targets)
-                    mask_y_pred = y_pred[mask]
-                    mask_target = targets[mask]
-                    test_pred.append(mask_y_pred.cpu().detach().numpy())
-                    test_true.append(mask_target.cpu().detach().numpy())
-                    #limit = limit + 1
-                    #if limit >= 10:
-                    #    break
-                
-                test_true = np.concatenate(test_true)
-                test_pred = np.concatenate(test_pred)
-                val_auc =  np.mean(roc_auc_score(test_true, test_pred) )
-                model.train()
-
-                if best_val_auc < val_auc:
-                    best_val_auc = val_auc
-                
-            print ('Epoch=%s, BatchID=%s, Val_AUC=%.4f, Best_Val_AUC=%.4f'%(epoch, batch_idx, val_auc, best_val_auc))
-            if cfg.optimizer == 'PESG':
-                print ('optimizer_lr=%.4f'%(optimizer.lr))
-        '''
+   
     return np.mean(avg_loss)
 
 def valid_test_epoch(cfg, name, epoch, model, device, data_loader, criterion, limit=20000): #change limit
@@ -376,32 +324,38 @@ def valid_test_epoch(cfg, name, epoch, model, device, data_loader, criterion, li
             targets = samples["lab"].to(device)
 
             outputs = model(images)
+
+            #LOSS
+            if cfg.loss_func == 'BCEWithLogitsLoss':
+                loss = BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights=None)
+            elif cfg.loss_func == 'AUCM_MultiLabel':
+                mask = ~torch.isnan(targets)
+                mask_output = outputs[mask]
+                mask_target = targets[mask]
+                mask_output = mask_output.view(outputs.size(0), -1)
+                mask_target = mask_target.view(targets.size(0), -1)
+                mask_output = torch.sigmoid(mask_output)
+                loss = criterion(mask_output, mask_target, auto=False)
+            avg_loss.append(loss.detach().cpu().numpy())
+            t.set_description(f'Epoch {epoch + 1} - Valid - Loss = {np.mean(avg_loss):4.4f}')
+            #LOSS
             
-            
-            loss = torch.zeros(1).to(device).double()
+            #AUC
             for task in range(targets.shape[1]):
                 task_output = outputs[:,task]
                 task_target = targets[:,task]
                 mask = ~torch.isnan(task_target)
                 task_output = task_output[mask]
                 task_target = task_target[mask]
-                if len(task_target) > 0:
-                    loss += criterion(task_output.double(), task_target.double())
-                    #print('+')
-                    #print(loss)
                     
                 task_outputs[task].append(task_output.detach().cpu().numpy())
                 task_targets[task].append(task_target.detach().cpu().numpy())
-
-            loss = loss.sum()
-                
-            avg_loss.append(loss.detach().cpu().numpy())
-            t.set_description(f'Epoch {epoch + 1} - {name} - Loss = {np.mean(avg_loss):4.4f}')
             
         for task in range(len(task_targets)):
             task_outputs[task] = np.concatenate(task_outputs[task])
             task_targets[task] = np.concatenate(task_targets[task])
-    
+        
+        #AUC
         task_aucs = []
         for task in range(len(task_targets)):
             if len(np.unique(task_targets[task]))> 1:
@@ -414,5 +368,6 @@ def valid_test_epoch(cfg, name, epoch, model, device, data_loader, criterion, li
     task_aucs = np.asarray(task_aucs)
     auc = np.mean(task_aucs[~np.isnan(task_aucs)])
     print(f'Epoch {epoch + 1} - {name} - Avg AUC = {auc:4.4f}')
+    avg_loss_ = np.mean(avg_loss)
 
-    return auc, task_aucs, task_outputs, task_targets
+    return auc, avg_loss_#, task_aucs, task_outputs, task_targets 

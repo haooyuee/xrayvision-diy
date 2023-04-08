@@ -17,14 +17,14 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
-    parser.add_argument('-name', type=str, default="pretrain_densenet_AUCM_MultiLabel") #pretrain_densenet
+    parser.add_argument('-name', type=str, default="test") #pretrain_densenet
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
     parser.add_argument('--model', type=str, default="densenet")#pretrain_densenet -" pretrain"
     parser.add_argument('--seed', type=int, default=0, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
-    parser.add_argument('--num_epochs', type=int, default=10, help='')
+    parser.add_argument('--num_epochs', type=int, default=1, help='')
     parser.add_argument('--batch_size', type=int, default=4, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
     parser.add_argument('--lr', type=float, default=0.01, help='')
@@ -41,8 +41,8 @@ if __name__ == '__main__':
     parser.add_argument('--labelunion', type=bool, default=False, help='')
 
         #add:
-    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel
-    parser.add_argument('--optimizer', type=str, default='PESG', help='')                   #adam or PESG
+    parser.add_argument('--loss_func', type=str, default='BCEWithLogitsLoss', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel
+    parser.add_argument('--optimizer', type=str, default='adam', help='')                   #adam or PESG
         #only for AUCM_MultiLabel and PESG
     parser.add_argument('--update_lr', type=bool, default=False, help='')                   #AUCM_MultiLabel update lr
     parser.add_argument('--update_regularizer', type=bool, default=False, help='')          #AUCM_MultiLabel update lr and update update_regularizer #DO NOT USE !!!

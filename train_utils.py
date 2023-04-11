@@ -8,6 +8,8 @@ from os.path import exists, join
 
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import sklearn.metrics
 from sklearn.metrics import roc_auc_score, accuracy_score
 import sklearn, sklearn.model_selection
@@ -56,7 +58,7 @@ def train(model, dataset, cfg):
         torch.backends.cudnn.benchmark = False
 
     # Dataset    
-    gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.01,test_size=0.03, random_state=cfg.seed) #0.03 for test
+    gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.01,test_size=0.01, random_state=cfg.seed)
     train_inds, test_inds = next(gss.split(X=range(len(dataset)), groups=dataset.csv.patientid))
     train_dataset = xrv.datasets.SubsetDataset(dataset, train_inds)
     valid_dataset = xrv.datasets.SubsetDataset(dataset, test_inds)
@@ -97,7 +99,9 @@ def train(model, dataset, cfg):
             print("imratio")
             print(imratio)
             #raise ValueError('test')
-            criterion = losses.AUCM_MultiLabel_V1(num_classes = 14, imratio=imratio, device=device)
+            criterion = losses.AUCM_MultiLabel_V1(margin = cfg.margin_AUCloss ,num_classes = 14, imratio=imratio, device=device)
+        elif cfg.loss_fuc == 'label_smoothing':
+            criterion = LabelSmoothingBCEWithLogitsLoss(smoothing=0.1, num_classes=14)
         else:
             raise ValueError('invalid loss function')
     print('criterion : ')
@@ -116,18 +120,14 @@ def train(model, dataset, cfg):
                  lr=cfg.lr, 
                  margin=1, 
                  epoch_decay=2e-3, 
-                 weight_decay=1e-5)
-        ##########################
-        # can add more optimizer #
-        ##########################
+                 weight_decay=1e-5,
+                 momentum=cfg.PESG_momentum
+                 )
         else:
             raise ValueError('invalid optimizer')
     print('optim : ')
     print(cfg.optimizer)
 
-    
-
-    
     # Checkpointing
     start_epoch = 0
     best_metric = 0.
@@ -152,7 +152,7 @@ def train(model, dataset, cfg):
                 elif cfg.update_regularizer:
                     optim.update_regularizer(decay_factor=cfg.decay_factor)
 
-        avg_loss  = train_epoch(cfg=cfg,
+        avg_loss = train_epoch(cfg=cfg,
                                epoch=epoch,
                                model=model,
                                device=device,
@@ -209,7 +209,24 @@ def save_logs(dictionary, log_dir, exp_id):
     # Log arguments
     with open(os.path.join(log_dir, "args.json"), "w") as f:
         json.dump(dictionary, f, indent=2)
-    
+        
+class LabelSmoothingBCEWithLogitsLoss(nn.Module):
+    def __init__(self, smoothing=0.1, num_classes=14):
+        super(LabelSmoothingBCEWithLogitsLoss, self).__init__()
+        self.smoothing = smoothing
+        self.num_classes = num_classes
+
+    def forward(self, logits, targets):
+        assert 0 <= self.smoothing < 1
+
+        # Smooth the labels
+        targets = targets * (1.0 - self.smoothing) + self.smoothing / self.num_classes
+
+        # Compute the binary cross-entropy with logits for multi-label classification
+        loss = F.binary_cross_entropy_with_logits(logits, targets)
+
+        return loss
+
 
 def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = None):
     loss = torch.zeros(1).to(device).float()  
@@ -254,6 +271,7 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
     weights = None
     best_val_auc = 0 
 
+    #compute task weights
     if cfg.taskweights:
         weights = np.nansum(train_loader.dataset.labels, axis=0)
         weights = weights.max() - weights + weights.mean()

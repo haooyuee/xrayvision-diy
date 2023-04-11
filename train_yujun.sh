@@ -19,19 +19,19 @@ source $SLURM_TMPDIR/env/bin/activate
 pip install -r $SOURCEDIR/requirements.txt
 
 # Start training
-python $SOURCEDIR/train_model_2.py \
+python $SOURCEDIR/train_model.py \
   --dataset_dir /home/yujunzhong/projects/def-sponsor00/fourguys \
   --model EfficientNet_V2 \
   --batch_size 6 \
   --num_epochs 80 \
   --output_dir effnet_lbl_smooth
-#python $SOURCEDIR/train_model_2.py \
+#python $SOURCEDIR/train_model.py \
 #  --dataset_dir /home/yujunzhong/projects/def-sponsor00/fourguys \
 #  --model resnet50 \
 #  --batch_size 8 \
 #  --num_epochs 100 \
 #  --output_dir resnet_lbl_smooth
-#python $SOURCEDIR/train_model_2.py \
+#python $SOURCEDIR/train_model.py \
 #  --dataset_dir /home/yujunzhong/projects/def-sponsor00/fourguys \
 #  --model densenet \
 #  --batch_size 8 \

@@ -7,6 +7,8 @@ from os.path import exists, join
 
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import sklearn.metrics
 from sklearn.metrics import roc_auc_score, accuracy_score
 import sklearn, sklearn.model_selection
@@ -22,8 +24,6 @@ def tqdm(*args, **kwargs):
 
 import losses
 from libauc.optimizers import PESG, Adam
-
-
 
 
 def train(model, dataset, cfg):
@@ -97,6 +97,8 @@ def train(model, dataset, cfg):
             print(imratio)
             #raise ValueError('test')
             criterion = losses.AUCM_MultiLabel_V1(num_classes = 14, imratio=imratio, device=device)
+        elif cfg.loss_fuc == 'label_smoothing':
+            criterion = LabelSmoothingBCEWithLogitsLoss(smoothing=0.1, num_classes=14)
         else:
             raise ValueError('invalid loss function')
     print('criterion : ')
@@ -124,9 +126,6 @@ def train(model, dataset, cfg):
     print('optim : ')
     print(cfg.optimizer)
 
-    
-
-    
     # Checkpointing
     start_epoch = 0
     best_metric = 0.
@@ -152,8 +151,6 @@ def train(model, dataset, cfg):
         print("Resuming training at epoch {0}.".format(start_epoch))
         print("Weights loaded: {0}".format(weights_file))
     '''
-    
-
     model.to(device)
     
     for epoch in range(start_epoch, cfg.num_epochs):
@@ -205,6 +202,23 @@ def train(model, dataset, cfg):
 
     return metrics, best_metric, weights_for_best_validauc
 
+
+class LabelSmoothingBCEWithLogitsLoss(nn.Module):
+    def __init__(self, smoothing=0.1, num_classes=14):
+        super(LabelSmoothingBCEWithLogitsLoss, self).__init__()
+        self.smoothing = smoothing
+        self.num_classes = num_classes
+
+    def forward(self, logits, targets):
+        assert 0 <= self.smoothing < 1
+
+        # Smooth the labels
+        targets = targets * (1.0 - self.smoothing) + self.smoothing / self.num_classes
+
+        # Compute the binary cross-entropy with logits for multi-label classification
+        loss = F.binary_cross_entropy_with_logits(logits, targets)
+
+        return loss
 
 
 def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = None):

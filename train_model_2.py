@@ -41,7 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('--labelunion', type=bool, default=False, help='')
 
         #add:
-    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel
+    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel or label_smoothing
     parser.add_argument('--optimizer', type=str, default='PESG', help='')                   #adam or PESG
         #only for AUCM_MultiLabel and PESG
     parser.add_argument('--update_lr', type=bool, default=False, help='')                   #AUCM_MultiLabel update lr
@@ -151,18 +151,15 @@ if __name__ == '__main__':
         model = torchvision.models.resnet101(num_classes=train_dataset.labels.shape[1], pretrained=False)
         #patch for single channel
         model.conv1 = torch.nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        
     elif "resnet50" in cfg.model:
         model = torchvision.models.resnet50(num_classes=train_dataset.labels.shape[1], pretrained=False)
         #patch for single channel
         model.conv1 = torch.nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
     elif "EfficientNet_V2" in cfg.model:
-        model = torchvision.models.efficientnet_v2_s(num_classes=train_dataset.labels.shape[1], pretrained=False)
+        model = torchvision.models.efficientnet_v2_s(num_classes=train_dataset.labels.shape[1])
         #patch for single channel
         print(model)
-        model.conv1 = torch.nn.Conv2d(1, 3, kernel_size=1, stride=1, padding=0, bias=False)
-
-
+        model.features[0][0] = torch.nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
     elif "pretrain_densenet" in cfg.model:
         model_path = "train_output/nih-densenet-test-best.pt"
         model = torch.load(model_path)

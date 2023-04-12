@@ -58,7 +58,7 @@ def train(model, dataset, cfg):
         torch.backends.cudnn.benchmark = False
 
     # Dataset    
-    gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.01,test_size=0.01, random_state=cfg.seed)
+    gss = sklearn.model_selection.GroupShuffleSplit(train_size=0.8,test_size=0.2, random_state=cfg.seed)
     train_inds, test_inds = next(gss.split(X=range(len(dataset)), groups=dataset.csv.patientid))
     train_dataset = xrv.datasets.SubsetDataset(dataset, train_inds)
     valid_dataset = xrv.datasets.SubsetDataset(dataset, test_inds)

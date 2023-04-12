@@ -17,19 +17,19 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
-    parser.add_argument('-name', type=str, default="pretrain_densenet_AUCM_MultiLabel") #pretrain_densenet
+    parser.add_argument('-name', type=str, default="test") #pretrain_densenet
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
     parser.add_argument('--model', type=str, default="densenet")#pretrain_densenet -" pretrain"
-    parser.add_argument('--seed', type=int, default=0, help='')
+    parser.add_argument('--seed', type=int, default=6759, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
-    parser.add_argument('--num_epochs', type=int, default=10, help='')
+    parser.add_argument('--num_epochs', type=int, default=1, help='')
     parser.add_argument('--batch_size', type=int, default=4, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
     parser.add_argument('--lr', type=float, default=0.01, help='')
     parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
-    parser.add_argument('--taskweights', type=bool, default=False, help='')# something interesting, not sure ?+++++++++++++++++++++++++
+    parser.add_argument('--taskweights', type=bool, default=False, help='')# taskweights for BCE loss
     parser.add_argument('--featurereg', type=bool, default=False, help='')
     parser.add_argument('--weightreg', type=bool, default=False, help='')
     parser.add_argument('--data_aug', type=bool, default=True, help='')
@@ -40,14 +40,20 @@ if __name__ == '__main__':
     parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
     parser.add_argument('--labelunion', type=bool, default=False, help='')
 
-        #add:
+
+    #choice loss function and optimizer
     parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel or label_smoothing
     parser.add_argument('--optimizer', type=str, default='PESG', help='')                   #adam or PESG
-        #only for AUCM_MultiLabel and PESG
+    
+    #only for AUCM_MultiLabel and PESG
     parser.add_argument('--update_lr', type=bool, default=False, help='')                   #AUCM_MultiLabel update lr
     parser.add_argument('--update_regularizer', type=bool, default=False, help='')          #AUCM_MultiLabel update lr and update update_regularizer #DO NOT USE !!!
     parser.add_argument('--decay_factor', type=float, default=2, help='')                   #new = old/decay_factor
     parser.add_argument('--decay_epoch', type=int, default=10, help='')                     #epoch%decay_epoch == 0 do update
+
+    parser.add_argument('--margin_AUCloss', type=float, default=1, help='')                 #can also be tuned in [0.5, 1.0] for better performance   
+    parser.add_argument('--PESG_momentum', type=float, default=0, help='')                  #is similar to SGD-momentum and you can choose value in [0, 0.9]
+
 
     print(os.getcwd())
     cfg = parser.parse_args()
@@ -64,19 +70,21 @@ if __name__ == '__main__':
             torchvision.transforms.ToTensor()
         ])
     print(data_aug)
-    transforms = torchvision.transforms.Compose([xrv.datasets.XRayCenterCrop(),xrv.datasets.XRayResizer(512)])####Resizer(512)??????????????????#########
-    print(transforms)
+
+    transforms = torchvision.transforms.Compose([xrv.datasets.XRayCenterCrop(),xrv.datasets.XRayResizer(512)])#Resizer(512)#
+
 
     datas = []
     datas_names = []
     #in our case will only use 2 dataset [nih,cheXpert]
     if "nih" in cfg.dataset:
         dataset = nih_dataset.NIH_Dataset(
-            imgpath=cfg.dataset_dir + "/images-NIH-224", #changed
+            imgpath=cfg.dataset_dir + "/images-NIH-224", #we use smaller data set
             transform=transforms, data_aug=data_aug, unique_patients=False, views=["PA","AP"])
         datas.append(dataset)
         datas_names.append("nih")
-
+    if "google" in cfg.dataset:
+        print("Yizao's show time")
     if "chex" in cfg.dataset:
         dataset = xrv.datasets.CheX_Dataset(
             imgpath=cfg.dataset_dir + "/CheXpert-v1.0-small",

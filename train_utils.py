@@ -133,6 +133,24 @@ def train(model, dataset, cfg):
     weights_for_best_validauc = None
     auc_test = None
     metrics = []
+    #***Reconnection after disconnection training***
+    weights_files = glob(join(cfg.output_dir, f'{dataset_name}-e*.pt'))  # Find all weights files
+    if len(weights_files):
+        # Find most recent epoch
+        epochs = np.array(
+            [int(w[len(join(cfg.output_dir, f'{dataset_name}-e')):-len('.pt')].split('-')[0]) for w in weights_files])
+        start_epoch = epochs.max()
+        weights_file = [weights_files[i] for i in np.argwhere(epochs == np.amax(epochs)).flatten()][0]
+        model.load_state_dict(torch.load(weights_file).state_dict())
+
+        with open(join(cfg.output_dir, f'{dataset_name}-metrics.pkl'), 'rb') as f:
+            metrics = pickle.load(f)
+
+        best_metric = metrics[-1]['best_metric']
+        weights_for_best_validauc = model.state_dict()
+
+        print("Resuming training at epoch {0}.".format(start_epoch))
+        print("Weights loaded: {0}".format(weights_file))
 
     model.to(device)
 

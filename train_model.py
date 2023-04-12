@@ -40,15 +40,17 @@ if __name__ == '__main__':
     parser.add_argument('--label_concat_reg', type=bool, default=False, help='')
     parser.add_argument('--labelunion', type=bool, default=False, help='')
 
+
     #choice loss function and optimizer
     parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel or label_smoothing
     parser.add_argument('--optimizer', type=str, default='PESG', help='')                   #adam or PESG
-
+    
     #only for AUCM_MultiLabel and PESG
     parser.add_argument('--update_lr', type=bool, default=False, help='')                   #AUCM_MultiLabel update lr
     parser.add_argument('--update_regularizer', type=bool, default=False, help='')          #AUCM_MultiLabel update lr and update update_regularizer #DO NOT USE !!!
     parser.add_argument('--decay_factor', type=float, default=2, help='')                   #new = old/decay_factor
     parser.add_argument('--decay_epoch', type=int, default=10, help='')                     #epoch%decay_epoch == 0 do update
+
     parser.add_argument('--margin_AUCloss', type=float, default=1, help='')                 #can also be tuned in [0.5, 1.0] for better performance   
     parser.add_argument('--PESG_momentum', type=float, default=0, help='')                  #is similar to SGD-momentum and you can choose value in [0, 0.9]
 
@@ -68,8 +70,9 @@ if __name__ == '__main__':
             torchvision.transforms.ToTensor()
         ])
     print(data_aug)
+
     transforms = torchvision.transforms.Compose([xrv.datasets.XRayCenterCrop(),xrv.datasets.XRayResizer(512)])#Resizer(512)#
-    print(transforms)
+
 
     datas = []
     datas_names = []
@@ -82,7 +85,6 @@ if __name__ == '__main__':
         datas_names.append("nih")
     if "google" in cfg.dataset:
         print("Yizao's show time")
-
     if "chex" in cfg.dataset:
         dataset = xrv.datasets.CheX_Dataset(
             imgpath=cfg.dataset_dir + "/CheXpert-v1.0-small",

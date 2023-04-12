@@ -27,8 +27,6 @@ import losses
 from libauc.optimizers import PESG, Adam
 
 
-
-
 def train(model, dataset, cfg):
     print("Our config:")
     pprint.pprint(cfg)
@@ -100,6 +98,7 @@ def train(model, dataset, cfg):
             print(imratio)
             #raise ValueError('test')
             criterion = losses.AUCM_MultiLabel_V1(margin = cfg.margin_AUCloss ,num_classes = 14, imratio=imratio, device=device)
+
         elif cfg.loss_fuc == 'label_smoothing':
             criterion = LabelSmoothingBCEWithLogitsLoss(smoothing=0.1, num_classes=14)
         else:
@@ -134,7 +133,7 @@ def train(model, dataset, cfg):
     weights_for_best_validauc = None
     auc_test = None
     metrics = []
-    
+
     model.to(device)
 
     #save train process
@@ -203,6 +202,7 @@ def train(model, dataset, cfg):
     return metrics, best_metric, weights_for_best_validauc
 
 
+
 def save_logs(dictionary, log_dir, exp_id):
     log_dir = os.path.join(log_dir, exp_id)
     os.makedirs(log_dir, exist_ok=True)
@@ -210,6 +210,7 @@ def save_logs(dictionary, log_dir, exp_id):
     with open(os.path.join(log_dir, "args.json"), "w") as f:
         json.dump(dictionary, f, indent=2)
         
+
 class LabelSmoothingBCEWithLogitsLoss(nn.Module):
     def __init__(self, smoothing=0.1, num_classes=14):
         super(LabelSmoothingBCEWithLogitsLoss, self).__init__()

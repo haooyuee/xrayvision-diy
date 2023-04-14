@@ -99,7 +99,7 @@ def train(model, dataset, cfg):
             #raise ValueError('test')
             criterion = losses.AUCM_MultiLabel_V1(margin = cfg.margin_AUCloss ,num_classes = 14, imratio=imratio, device=device)
 
-        elif cfg.loss_fuc == 'label_smoothing':
+        elif cfg.loss_func == 'label_smoothing':
             criterion = LabelSmoothingBCEWithLogitsLoss(smoothing=0.1, num_classes=14)
         else:
             raise ValueError('invalid loss function')
@@ -159,6 +159,7 @@ def train(model, dataset, cfg):
     logger['train_losses'] = []
     logger['eval_losses'] = []
     logger['eval_auc'] = []
+
 
     for epoch in range(start_epoch, cfg.num_epochs):
         #add hyper update

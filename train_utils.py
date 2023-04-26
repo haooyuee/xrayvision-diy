@@ -248,7 +248,7 @@ class LabelSmoothingBCEWithLogitsLoss(nn.Module):
         return loss
 
 
-def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = None):
+def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = None, smoothing=0.1, num_classes=14):
     loss = torch.zeros(1).to(device).float()  
     for task in range(targets.shape[1]):
         task_output = outputs[:,task]
@@ -261,8 +261,13 @@ def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = No
         #print('task_target')
         #print(task_target)
         if len(task_target) > 0:
+
+            if cfg.loss_func == 'label_smoothing':
+                # Smooth the labels
+                targets = targets * (1.0 - smoothing) + smoothing / num_classes
             task_loss = criterion(task_output.float(), task_target.float())
             #print('task_loss' + str(task_loss))
+
             if cfg.taskweights:
                     loss += weights[task]*task_loss
             else:
@@ -314,7 +319,7 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         targets = samples["lab"].to(device)
         outputs = model(images)
         
-        if cfg.loss_func == 'BCEWithLogitsLoss':
+        if cfg.loss_func == 'BCEWithLogitsLoss' or 'label_smoothing':
             loss = BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights)
         elif cfg.loss_func == 'AUCM_MultiLabel':
             mask = ~torch.isnan(targets)
@@ -364,7 +369,7 @@ def valid_test_epoch(cfg, name, epoch, model, device, data_loader, criterion, li
             outputs = model(images)
 
             #LOSS
-            if cfg.loss_func == 'BCEWithLogitsLoss':
+            if cfg.loss_func == 'BCEWithLogitsLoss' or 'label_smoothing':
                 loss = BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights=None)
             elif cfg.loss_func == 'AUCM_MultiLabel':
                 mask = ~torch.isnan(targets)

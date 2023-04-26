@@ -99,7 +99,7 @@ def train(model, dataset, cfg):
             #raise ValueError('test')
             criterion = losses.AUCM_MultiLabel_V1(margin = cfg.margin_AUCloss ,num_classes = 14, imratio=imratio, device=device)
 
-        elif cfg.loss_fuc == 'label_smoothing':
+        elif cfg.loss_func == 'label_smoothing':
             criterion = LabelSmoothingBCEWithLogitsLoss(smoothing=0.1, num_classes=14)
         else:
             raise ValueError('invalid loss function')
@@ -133,6 +133,24 @@ def train(model, dataset, cfg):
     weights_for_best_validauc = None
     auc_test = None
     metrics = []
+    #***Reconnection after disconnection training***
+    weights_files = glob(join(cfg.output_dir, f'{dataset_name}-e*.pt'))  # Find all weights files
+    if len(weights_files):
+        # Find most recent epoch
+        epochs = np.array(
+            [int(w[len(join(cfg.output_dir, f'{dataset_name}-e')):-len('.pt')].split('-')[0]) for w in weights_files])
+        start_epoch = epochs.max()
+        weights_file = [weights_files[i] for i in np.argwhere(epochs == np.amax(epochs)).flatten()][0]
+        model.load_state_dict(torch.load(weights_file).state_dict())
+
+        with open(join(cfg.output_dir, f'{dataset_name}-metrics.pkl'), 'rb') as f:
+            metrics = pickle.load(f)
+
+        best_metric = metrics[-1]['best_metric']
+        weights_for_best_validauc = model.state_dict()
+
+        print("Resuming training at epoch {0}.".format(start_epoch))
+        print("Weights loaded: {0}".format(weights_file))
 
     model.to(device)
 
@@ -141,6 +159,7 @@ def train(model, dataset, cfg):
     logger['train_losses'] = []
     logger['eval_losses'] = []
     logger['eval_auc'] = []
+
 
     for epoch in range(start_epoch, cfg.num_epochs):
         #add hyper update
@@ -229,7 +248,7 @@ class LabelSmoothingBCEWithLogitsLoss(nn.Module):
         return loss
 
 
-def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = None):
+def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = None, smoothing=0.1, num_classes=14):
     loss = torch.zeros(1).to(device).float()  
     for task in range(targets.shape[1]):
         task_output = outputs[:,task]
@@ -242,8 +261,13 @@ def BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights = No
         #print('task_target')
         #print(task_target)
         if len(task_target) > 0:
+
+            if cfg.loss_func == 'label_smoothing':
+                # Smooth the labels
+                targets = targets * (1.0 - smoothing) + smoothing / num_classes
             task_loss = criterion(task_output.float(), task_target.float())
             #print('task_loss' + str(task_loss))
+
             if cfg.taskweights:
                     loss += weights[task]*task_loss
             else:
@@ -295,7 +319,7 @@ def train_epoch(cfg, epoch, model, device, train_loader, valid_loader, optimizer
         targets = samples["lab"].to(device)
         outputs = model(images)
         
-        if cfg.loss_func == 'BCEWithLogitsLoss':
+        if cfg.loss_func == 'BCEWithLogitsLoss' or 'label_smoothing':
             loss = BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights)
         elif cfg.loss_func == 'AUCM_MultiLabel':
             mask = ~torch.isnan(targets)
@@ -345,7 +369,7 @@ def valid_test_epoch(cfg, name, epoch, model, device, data_loader, criterion, li
             outputs = model(images)
 
             #LOSS
-            if cfg.loss_func == 'BCEWithLogitsLoss':
+            if cfg.loss_func == 'BCEWithLogitsLoss' or 'label_smoothing':
                 loss = BCELogits_loss(cfg, device, targets, outputs, criterion, model, weights=None)
             elif cfg.loss_func == 'AUCM_MultiLabel':
                 mask = ~torch.isnan(targets)

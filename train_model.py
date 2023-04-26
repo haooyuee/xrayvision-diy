@@ -24,12 +24,12 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default="densenet")#pretrain_densenet -" pretrain"
     parser.add_argument('--seed', type=int, default=6759, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
-    parser.add_argument('--num_epochs', type=int, default=1, help='')
+    parser.add_argument('--num_epochs', type=int, default=10, help='')
     parser.add_argument('--batch_size', type=int, default=4, help='')
     parser.add_argument('--shuffle', type=bool, default=True, help='')
     parser.add_argument('--lr', type=float, default=0.01, help='')
     parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
-    parser.add_argument('--taskweights', type=bool, default=False, help='')# taskweights for BCE loss
+    parser.add_argument('--taskweights', type=bool, default=True, help='')# taskweights for BCE loss
     parser.add_argument('--featurereg', type=bool, default=False, help='')
     parser.add_argument('--weightreg', type=bool, default=False, help='')
     parser.add_argument('--data_aug', type=bool, default=True, help='')
@@ -42,8 +42,8 @@ if __name__ == '__main__':
 
 
     #choice loss function and optimizer
-    parser.add_argument('--loss_func', type=str, default='AUCM_MultiLabel', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel or label_smoothing
-    parser.add_argument('--optimizer', type=str, default='PESG', help='')                   #adam or PESG
+    parser.add_argument('--loss_func', type=str, default='BCEWithLogitsLoss', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel or label_smoothing
+    parser.add_argument('--optimizer', type=str, default='adam', help='')                   #adam or PESG
     
     #only for AUCM_MultiLabel and PESG
     parser.add_argument('--update_lr', type=bool, default=False, help='')                   #AUCM_MultiLabel update lr

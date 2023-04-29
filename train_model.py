@@ -17,7 +17,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
-    parser.add_argument('-name', type=str, default="test") #pretrain_densenet
+    parser.add_argument('-name', type=str, default="test1") #pretrain_densenet
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--shuffle', type=bool, default=True, help='')
     parser.add_argument('--lr', type=float, default=0.01, help='')
     parser.add_argument('--threads', type=int, default=4, help='') #torch.utils.data.DataLoader(num_workers=cfg.threads,)
-    parser.add_argument('--taskweights', type=bool, default=True, help='')# taskweights for BCE loss
+    parser.add_argument('--taskweights', type=bool, default=False, help='')# taskweights for BCE loss
     parser.add_argument('--featurereg', type=bool, default=False, help='')
     parser.add_argument('--weightreg', type=bool, default=False, help='')
     parser.add_argument('--data_aug', type=bool, default=True, help='')
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
 
     #choice loss function and optimizer
-    parser.add_argument('--loss_func', type=str, default='BCEWithLogitsLoss', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel or label_smoothing
+    parser.add_argument('--loss_func', type=str, default='label_smoothing', help='')        #BCEWithLogitsLoss or AUCM_MultiLabel or label_smoothing
     parser.add_argument('--optimizer', type=str, default='adam', help='')                   #adam or PESG
     
     #only for AUCM_MultiLabel and PESG
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     if "nih" in cfg.dataset:
         dataset = nih_dataset.NIH_Dataset(
             imgpath=cfg.dataset_dir + "/images-NIH-224", #we use smaller data set
-            transform=transforms, data_aug=data_aug, unique_patients=False, views=["PA","AP"])
+            transform=transforms, data_aug=data_aug, views=["PA","AP"])
         datas.append(dataset)
         datas_names.append("nih")
     if "google" in cfg.dataset:
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         dataset = xrv.datasets.CheX_Dataset(
             imgpath=cfg.dataset_dir + "/CheXpert-v1.0-small",
             csvpath=cfg.dataset_dir + "/CheXpert-v1.0-small/train.csv",
-            transform=transforms, data_aug=data_aug, unique_patients=False)
+            transform=transforms, data_aug=data_aug)
         datas.append(dataset)
         datas_names.append("chex")
     

@@ -170,7 +170,7 @@ if __name__ == '__main__':
         print(model)
         model.features[0][0] = torch.nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
     elif "pretrain_densenet" in cfg.model:
-        model_path = "train_output/nih-densenet-test-best.pt"
+        model_path = "pretrained/nih-densenet-test-best.pt"
         model = torch.load(model_path)
 
     else:

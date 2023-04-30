@@ -102,7 +102,9 @@ python train_model.py \
 ```
 ## Results
 AUC comparison of different models, note that the Densenet+Non-local model is fine-tuned on the pre-trained model.
+
 !['model_aucs'](figures/model_aucs.png)
 
 The performance of the model when using different loss functions.
+
 !['loss_aucs'](figures/loss_aucs.png)

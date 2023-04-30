@@ -36,9 +36,7 @@ python train_model.py \
 ```
 ### Testing:
 ```
-python test_model.py \
- --dataset_dir /root/directory/of/NIH \
- --model_path path/to/the/model
+python test_model.py --model_path path/to/the/model
 ```
 
 ## Examples
@@ -103,8 +101,10 @@ python train_model.py \
  --output_dir /output/directory
 ```
 ## Results
-### AUC comparison of different models, note that the Densenet+Non-local model is fine-tuned on the pre-trained model.
+AUC comparison of different models, note that the Densenet+Non-local model is fine-tuned on the pre-trained model.
+
 !['model_aucs'](figures/model_aucs.png)
 
-### The performance of the model when using different loss functions.
+The performance of the model when using different loss functions.
+
 !['loss_aucs'](figures/loss_aucs.png)

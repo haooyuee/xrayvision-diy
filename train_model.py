@@ -18,10 +18,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     #parser.add_argument('-f', type=str, default="", help='')
     parser.add_argument('-name', type=str, default="test1") #pretrain_densenet
+    parser.add_argument('--test', type=bool, default=True, help='') #if true use sub dataset for test code <0.03,0.03>
     parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--dataset', type=str, default="nih")
     parser.add_argument('--dataset_dir', type=str, default="imgdata")
-    parser.add_argument('--model', type=str, default="densenet")#pretrain_densenet -" pretrain"
+    parser.add_argument('--model', type=str, default="densenet")#pretrain_densenet -"pretrain"
     parser.add_argument('--seed', type=int, default=6759, help='')
     parser.add_argument('--cuda', type=bool, default=True, help='')
     parser.add_argument('--num_epochs', type=int, default=10, help='')

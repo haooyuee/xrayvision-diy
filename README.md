@@ -87,7 +87,15 @@ python train_model.py \
 ```
 ### Densenet + Non-local module
 ```
-
+python  new/model_calibrate.py nih densenet121-res224-all \
+  -mdtable\
+  --num_epochs 100\
+  -batch_size 8\
+  --model densenet \
+  -name nonlocal \
+  --output_dir $SOURCEDIR/torchxrayvision/output \
+  --dataset_dir /home/yizhaowang/projects/def-sponsor00/fourguys 
+  
 ```
 ### Label smoothing
 ```

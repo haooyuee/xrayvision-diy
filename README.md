@@ -93,8 +93,8 @@ python  new/model_calibrate.py nih densenet121-res224-all \
   -batch_size 8\
   --model densenet \
   -name nonlocal \
-  --output_dir $SOURCEDIR/torchxrayvision/output \
-  --dataset_dir /home/yizhaowang/projects/def-sponsor00/fourguys 
+  --output_dir /output/directory \
+  --dataset_dir /root/directory/of/NIH 
   
 ```
 ### Label smoothing
